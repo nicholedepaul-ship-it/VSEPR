@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Molecular Builder</title>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Import Map for Three.js -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"
+            }
+        }
+    </script>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #f8fafc; }
+        canvas { display: block; outline: none; }
+        /* Custom scrollbar for sidebar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+    </style>
+</head>
+<body class="text-slate-700 h-screen w-screen overflow-hidden flex flex-col md:flex-row">
+
+    <!-- Sidebar Controls -->
+    <div class="w-full md:w-96 flex-shrink-0 bg-white border-b md:border-b-0 md:border-r border-slate-200 shadow-xl z-20 flex flex-col p-6 overflow-y-auto relative">
+        <div class="mb-4">
+            <h1 class="text-2xl font-bold text-indigo-600 flex items-center gap-2">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
+                Molecule Builder
+            </h1>
+            <p class="text-sm text-slate-500 mt-1">Build molecules to explore VSEPR geometry.</p>
+        </div>
+
+        <!-- Current Geometry Display -->
+        <div class="bg-indigo-50 p-4 rounded-xl border border-indigo-100 text-center mb-6">
+            <div class="text-[10px] uppercase font-bold text-indigo-400 tracking-wider mb-1">Current Shape</div>
+            <div id="geo-name" class="text-xl font-bold text-indigo-900">Linear</div>
+            <div id="angle-display" class="text-sm text-indigo-600 font-mono mt-1 font-semibold">180°</div>
+        </div>
+
+        <!-- Interactive Parts Tray -->
+        <div class="flex-1">
+            <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Parts Tray</h3>
+            
+            <div class="grid grid-cols-2 gap-3 mb-4">
+                <button onclick="addPart('bond')" class="group relative flex flex-col items-center justify-center p-4 bg-slate-50 border-2 border-slate-200 rounded-xl hover:border-green-500 hover:bg-white hover:shadow-md transition-all active:scale-95">
+                    <div class="w-10 h-10 mb-2 relative flex items-center justify-center">
+                        <div class="w-3 h-3 rounded-full bg-slate-400 absolute left-1"></div>
+                        <div class="w-6 h-1 bg-slate-300"></div>
+                        <div class="w-4 h-4 rounded-full bg-green-500 absolute right-1 shadow-sm group-hover:scale-110 transition-transform"></div>
+                    </div>
+                    <span class="text-xs font-bold text-slate-600 group-hover:text-green-600">Add Atom</span>
+                </button>
+
+                <button onclick="addPart('lone')" class="group relative flex flex-col items-center justify-center p-4 bg-slate-50 border-2 border-slate-200 rounded-xl hover:border-amber-400 hover:bg-white hover:shadow-md transition-all active:scale-95">
+                    <div class="w-10 h-10 mb-2 flex items-center justify-center">
+                       <div class="w-8 h-6 rounded-full bg-amber-200 border-2 border-amber-400 opacity-80 group-hover:scale-110 transition-transform"></div>
+                    </div>
+                    <span class="text-xs font-bold text-slate-600 group-hover:text-amber-600">Add Lone Pair</span>
+                </button>
+            </div>
+
+            <!-- Inventory List / Management -->
+            <div class="bg-white rounded-lg border border-slate-200 p-3 mb-6">
+                <div class="flex items-center justify-between mb-2 pb-2 border-b border-slate-100">
+                     <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Your Parts</span>
+                     <button onclick="resetMolecule()" class="text-[10px] uppercase font-bold text-red-400 hover:text-red-600 transition-colors">Clear All</button>
+                </div>
+                
+                <!-- Atom Manager -->
+                <div class="flex items-center justify-between py-1">
+                    <div class="flex items-center gap-2 text-sm font-medium text-slate-600">
+                        <span class="w-2 h-2 rounded-full bg-green-500"></span> Atoms
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button onclick="removePart('bond')" class="w-6 h-6 flex items-center justify-center rounded bg-slate-100 text-slate-500 hover:bg-red-50 hover:text-red-500 transition-colors" title="Remove Atom">
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"></path></svg>
+                        </button>
+                        <span id="bond-count" class="font-mono font-bold w-4 text-center">2</span>
+                    </div>
+                </div>
+
+                <!-- Lone Pair Manager -->
+                <div class="flex items-center justify-between py-1 mt-1">
+                    <div class="flex items-center gap-2 text-sm font-medium text-slate-600">
+                        <span class="w-2 h-2 rounded-full bg-amber-400"></span> Lone Pairs
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button onclick="removePart('lone')" class="w-6 h-6 flex items-center justify-center rounded bg-slate-100 text-slate-500 hover:bg-red-50 hover:text-red-500 transition-colors" title="Remove Lone Pair">
+                             <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"></path></svg>
+                        </button>
+                        <span id="lone-count" class="font-mono font-bold w-4 text-center">0</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- NEW: Challenge Mode -->
+            <div class="border-t border-slate-100 pt-4">
+                <div class="flex items-center justify-between mb-2">
+                    <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Practice Challenge</h3>
+                    <span id="challenge-counter" class="text-xs text-slate-400 font-mono">1/6</span>
+                </div>
+                
+                <div class="bg-gradient-to-br from-indigo-600 to-blue-600 rounded-xl p-4 text-white shadow-lg relative overflow-hidden">
+                    <!-- Decor -->
+                    <div class="absolute top-0 right-0 -mt-2 -mr-2 w-16 h-16 bg-white opacity-10 rounded-full"></div>
+                    
+                    <div class="relative z-10">
+                        <div class="text-indigo-200 text-[10px] font-bold uppercase tracking-wide mb-1">Target Molecule</div>
+                        <div class="flex justify-between items-end mb-4">
+                            <div>
+                                <div id="target-formula" class="text-3xl font-bold font-mono tracking-tight leading-none mb-1">CO₂</div>
+                                <div id="target-name" class="text-xs text-indigo-100 font-medium">Carbon Dioxide</div>
+                            </div>
+                            <div class="text-right">
+                                <div id="target-hint" class="text-[10px] bg-indigo-500/50 backdrop-blur px-2 py-1 rounded text-indigo-100 border border-indigo-400/30">Hint: Linear</div>
+                            </div>
+                        </div>
+
+                        <!-- Feedback Area -->
+                        <div id="feedback-area" class="hidden mb-3 text-sm font-bold p-2 rounded text-center shadow-inner transition-all"></div>
+
+                        <!-- Buttons -->
+                        <button id="check-btn" onclick="checkChallenge()" class="w-full bg-white text-indigo-700 font-bold py-2.5 rounded-lg text-sm hover:bg-indigo-50 transition-colors shadow-sm active:translate-y-0.5">
+                            Check Structure
+                        </button>
+                        <button id="next-btn" onclick="nextChallenge()" class="hidden w-full bg-emerald-500 text-white font-bold py-2.5 rounded-lg text-sm hover:bg-emerald-600 transition-colors shadow-sm flex items-center justify-center gap-2 active:translate-y-0.5">
+                            Next Molecule <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path></svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="mt-4 text-xs text-center text-slate-400">
+                Drag background to rotate view
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Canvas Area -->
+    <div class="flex-1 relative bg-slate-50 h-full w-full overflow-hidden cursor-move" id="canvas-wrapper">
+        <!-- 3D Canvas -->
+        <div id="canvas-container" class="absolute inset-0 z-0"></div>
+        
+        <!-- Floating Legend -->
+        <div class="absolute bottom-4 left-4 z-10 bg-white/90 backdrop-blur px-3 py-2 rounded-lg shadow-sm border border-slate-200 text-xs text-slate-500 pointer-events-none select-none">
+            <div class="flex items-center gap-2 mb-1"><span class="w-2 h-2 rounded-full bg-slate-700"></span> Central Atom</div>
+            <div class="flex items-center gap-2 mb-1"><span class="w-2 h-2 rounded-full bg-green-500"></span> Bonded Atom</div>
+            <div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-amber-400 opacity-60"></span> Lone Pair</div>
+        </div>
+    </div>
+
+    <!-- Logic -->
+    <script type="module">
+        import * as THREE from 'three';
+
+        // --- STATE ---
+        let bonds = 2;
+        let lonePairs = 0;
+
+        // Challenge Data
+        const challenges = [
+            { formula: "CO₂", name: "Carbon Dioxide", bonds: 2, lone: 0, hint: "Double bonds act as 1 domain" },
+            { formula: "H₂O", name: "Water", bonds: 2, lone: 2, hint: "Oxygen has 2 lone pairs" },
+            { formula: "BF₃", name: "Boron Trifluoride", bonds: 3, lone: 0, hint: "Incomplete octet (6e-)" },
+            { formula: "NH₃", name: "Ammonia", bonds: 3, lone: 1, hint: "1 Lone Pair on Nitrogen" },
+            { formula: "CH₄", name: "Methane", bonds: 4, lone: 0, hint: "Classic Tetrahedral" },
+            { formula: "PCl₅", name: "Phosphorus Pentachloride", bonds: 5, lone: 0, hint: "Expanded octet" },
+            { formula: "SF₆", name: "Sulfur Hexafluoride", bonds: 6, lone: 0, hint: "Max domains" }
+        ];
+        let currentChallengeIdx = 0;
+
+        // --- THREE.JS SETUP ---
+        const container = document.getElementById('canvas-container');
+        const wrapper = document.getElementById('canvas-wrapper');
+        
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color('#f8fafc'); // Match slate-50
+
+        // Camera setup
+        const camera = new THREE.PerspectiveCamera(45, wrapper.clientWidth / wrapper.clientHeight, 0.1, 100);
+        camera.position.set(0, 1, 7);
+        camera.lookAt(0, 0, 0);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(wrapper.clientWidth, wrapper.clientHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Optimize for mobile
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        container.appendChild(renderer.domElement);
+
+        // Lights
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
+        
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.9);
+        dirLight.position.set(5, 8, 5);
+        dirLight.castShadow = true;
+        dirLight.shadow.mapSize.width = 1024;
+        dirLight.shadow.mapSize.height = 1024;
+        scene.add(dirLight);
+
+        const backLight = new THREE.DirectionalLight(0xffffff, 0.3);
+        backLight.position.set(-5, 0, -5);
+        scene.add(backLight);
+
+        // Molecule Group
+        const moleculeGroup = new THREE.Group();
+        scene.add(moleculeGroup);
+
+        // Central Atom (Static)
+        const centralGeo = new THREE.SphereGeometry(0.85, 32, 32);
+        const centralMat = new THREE.MeshPhysicalMaterial({ 
+            color: '#334155', 
+            roughness: 0.2, 
+            metalness: 0.1,
+            clearcoat: 0.5 
+        }); 
+        const centralAtom = new THREE.Mesh(centralGeo, centralMat);
+        centralAtom.castShadow = true;
+        centralAtom.receiveShadow = true;
+        moleculeGroup.add(centralAtom);
+
+        // --- LOGIC ---
+
+        function updateUI() {
+            document.getElementById('bond-count').innerText = bonds;
+            document.getElementById('lone-count').innerText = lonePairs;
+            
+            // Determine Geometry Name
+            const total = bonds + lonePairs;
+            let name = "Unknown";
+            let angle = "";
+
+            if (total === 2) { name = "Linear"; angle = "180°"; }
+            else if (total === 3) {
+                if (lonePairs === 0) { name = "Trigonal Planar"; angle = "120°"; }
+                else { name = "Bent"; angle = "<120°"; }
+            }
+            else if (total === 4) {
+                if (lonePairs === 0) { name = "Tetrahedral"; angle = "109.5°"; }
+                else if (lonePairs === 1) { name = "Trigonal Pyramidal"; angle = "<109.5°"; }
+                else { name = "Bent"; angle = "<<109.5°"; }
+            }
+            else if (total === 5) {
+                if (lonePairs === 0) { name = "Trigonal Bipyramidal"; angle = "90°, 120°"; }
+                else if (lonePairs === 1) { name = "Seesaw"; angle = "<90°, <120°"; }
+                else if (lonePairs === 2) { name = "T-Shaped"; angle = "<90°"; }
+                else { name = "Linear"; angle = "180°"; }
+            }
+            else if (total === 6) {
+                if (lonePairs === 0) { name = "Octahedral"; angle = "90°"; }
+                else if (lonePairs === 1) { name = "Square Pyramidal"; angle = "90°"; }
+                else if (lonePairs === 2) { name = "Square Planar"; angle = "90°"; }
+            }
+
+            document.getElementById('geo-name').innerText = name;
+            document.getElementById('angle-display').innerText = angle;
+        }
+
+        function rebuildMolecule() {
+            // Remove old children (except central atom at index 0)
+            while(moleculeGroup.children.length > 1) {
+                const child = moleculeGroup.children[moleculeGroup.children.length - 1];
+                if(child.geometry) child.geometry.dispose();
+                if(child.material) child.material.dispose();
+                moleculeGroup.remove(child);
+            }
+
+            const total = bonds + lonePairs;
+            const r = 2.4;
+            let positions = [];
+
+            // 1. Calculate Positions (VSEPR Math)
+            if (total === 2) {
+                positions = [new THREE.Vector3(r,0,0), new THREE.Vector3(-r,0,0)];
+            } else if (total === 3) {
+                for(let i=0; i<3; i++) {
+                    const a = (i * 2 * Math.PI) / 3;
+                    positions.push(new THREE.Vector3(r*Math.cos(a), r*Math.sin(a), 0));
+                }
+            } else if (total === 4) {
+                const a = 109.5 * (Math.PI/180);
+                positions = [
+                    new THREE.Vector3(0,r,0),
+                    new THREE.Vector3(r*Math.sin(a), r*Math.cos(a), 0),
+                    new THREE.Vector3(r*Math.sin(a)*-0.5, r*Math.cos(a), r*Math.sin(a)*0.866),
+                    new THREE.Vector3(r*Math.sin(a)*-0.5, r*Math.cos(a), -r*Math.sin(a)*0.866)
+                ];
+            } else if (total === 5) {
+                positions.push(new THREE.Vector3(0, r, 0)); // Axial
+                positions.push(new THREE.Vector3(0, -r, 0)); // Axial
+                for (let i = 0; i < 3; i++) {
+                    const angle = (i * 2 * Math.PI) / 3;
+                    positions.push(new THREE.Vector3(r * Math.cos(angle), 0, r * Math.sin(angle)));
+                }
+                // TBP Specific Sorting: Put Equatorial last in array to Front for Lone Pairs
+                positions = [positions[2], positions[3], positions[4], positions[0], positions[1]];
+            } else if (total === 6) {
+                positions = [
+                    new THREE.Vector3(0, r, 0), new THREE.Vector3(0, -r, 0),
+                    new THREE.Vector3(r, 0, 0), new THREE.Vector3(-r, 0, 0),
+                    new THREE.Vector3(0, 0, r), new THREE.Vector3(0, 0, -r)
+                ];
+            }
+
+            // 2. Assign Types (Lone Pairs first)
+            let types = [];
+            for(let i=0; i<lonePairs; i++) types.push('lone');
+            for(let i=0; i<bonds; i++) types.push('bond');
+
+            // 3. Create Meshes
+            types.forEach((type, idx) => {
+                if(idx >= positions.length) return;
+                const pos = positions[idx];
+
+                // Stick (Bond)
+                const stickGeo = new THREE.CylinderGeometry(0.12, 0.12, r * 0.9, 12);
+                stickGeo.rotateX(Math.PI/2);
+                const stickMat = new THREE.MeshStandardMaterial({ color: '#cbd5e1', roughness: 0.3 });
+                const stick = new THREE.Mesh(stickGeo, stickMat);
+                stick.lookAt(pos);
+                stick.position.set(pos.x/2, pos.y/2, pos.z/2);
+                stick.castShadow = true;
+                
+                if (type === 'bond') {
+                    // Atom (Green Ball)
+                    const atomGeo = new THREE.SphereGeometry(0.65, 32, 32);
+                    const atomMat = new THREE.MeshPhysicalMaterial({ 
+                        color: '#22c55e', 
+                        roughness: 0.2, 
+                        clearcoat: 0.3 
+                    });
+                    const atom = new THREE.Mesh(atomGeo, atomMat);
+                    atom.position.copy(pos);
+                    atom.castShadow = true;
+                    atom.receiveShadow = true;
+                    
+                    moleculeGroup.add(atom);
+                    moleculeGroup.add(stick);
+                } else {
+                    // Lone Pair (Transparent Balloon)
+                    const lpGeo = new THREE.SphereGeometry(0.7, 24, 24);
+                    lpGeo.scale(0.5, 1, 0.5);
+                    const lpMat = new THREE.MeshPhysicalMaterial({ 
+                        color: '#fbbf24', 
+                        transparent: true, 
+                        opacity: 0.5, 
+                        roughness: 0.1, 
+                        transmission: 0.2
+                    });
+                    const lp = new THREE.Mesh(lpGeo, lpMat);
+                    
+                    // Position closer to center
+                    const lpPos = pos.clone().normalize().multiplyScalar(1.2);
+                    lp.position.copy(lpPos);
+                    lp.lookAt(pos);
+                    
+                    moleculeGroup.add(lp);
+                }
+            });
+
+            updateUI();
+        }
+
+        // --- INTERACTION ---
+        window.addPart = (type) => {
+            if (bonds + lonePairs >= 6) return;
+            if (type === 'bond') bonds++;
+            if (type === 'lone') lonePairs++;
+            rebuildMolecule();
+        };
+
+        // NEW: Function to remove parts
+        window.removePart = (type) => {
+            if (type === 'bond' && bonds > 0) bonds--;
+            if (type === 'lone' && lonePairs > 0) lonePairs--;
+            rebuildMolecule();
+        };
+
+        window.resetMolecule = () => {
+            bonds = 0;
+            lonePairs = 0;
+            rebuildMolecule();
+        };
+
+        // --- CHALLENGE LOGIC ---
+        window.loadChallenge = () => {
+            const target = challenges[currentChallengeIdx];
+            document.getElementById('target-formula').textContent = target.formula;
+            document.getElementById('target-name').textContent = target.name;
+            document.getElementById('target-hint').textContent = target.hint;
+            document.getElementById('challenge-counter').textContent = `${currentChallengeIdx + 1}/${challenges.length}`;
+            
+            // Reset UI states
+            document.getElementById('check-btn').classList.remove('hidden');
+            document.getElementById('next-btn').classList.add('hidden');
+            const feedback = document.getElementById('feedback-area');
+            feedback.classList.add('hidden');
+            feedback.className = "hidden mb-3 text-sm font-bold p-2 rounded text-center shadow-inner transition-all"; 
+        };
+
+        window.checkChallenge = () => {
+            const target = challenges[currentChallengeIdx];
+            const feedback = document.getElementById('feedback-area');
+            feedback.classList.remove('hidden');
+
+            if (bonds === target.bonds && lonePairs === target.lone) {
+                feedback.innerHTML = "Correct! <br><span class='font-normal text-xs'>Great job building " + target.formula + "</span>";
+                feedback.className = "mb-3 text-sm font-bold bg-emerald-500 text-white p-2 rounded text-center shadow-inner animate-pulse";
+                
+                // Stop pulse after 500ms
+                setTimeout(() => feedback.classList.remove('animate-pulse'), 500);
+
+                document.getElementById('check-btn').classList.add('hidden');
+                document.getElementById('next-btn').classList.remove('hidden');
+            } else {
+                let msg = "Not quite.";
+                if (bonds !== target.bonds) msg = "Check number of atoms.";
+                else if (lonePairs !== target.lone) msg = "Check lone pairs.";
+                
+                feedback.textContent = msg;
+                feedback.className = "mb-3 text-sm font-bold bg-rose-500 text-white p-2 rounded text-center shadow-inner";
+            }
+        };
+
+        window.nextChallenge = () => {
+            currentChallengeIdx = (currentChallengeIdx + 1) % challenges.length;
+            // Clear board for new challenge
+            bonds = 0; 
+            lonePairs = 0; 
+            rebuildMolecule();
+            loadChallenge();
+        };
+
+
+        // Initialize
+        rebuildMolecule();
+        loadChallenge();
+
+        // Animation Loop
+        let isDragging = false;
+        let previousMousePosition = { x: 0, y: 0 };
+
+        function animate() {
+            requestAnimationFrame(animate);
+            if (!isDragging) {
+                moleculeGroup.rotation.y += 0.002;
+            }
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        // Interaction Handlers (Mouse & Touch)
+        const canvasEl = renderer.domElement;
+
+        const onStart = (clientX, clientY) => {
+            isDragging = true;
+            previousMousePosition = { x: clientX, y: clientY };
+        };
+
+        const onMove = (clientX, clientY) => {
+            if (isDragging) {
+                const deltaMove = { x: clientX - previousMousePosition.x, y: clientY - previousMousePosition.y };
+                moleculeGroup.rotation.y += deltaMove.x * 0.005;
+                moleculeGroup.rotation.x += deltaMove.y * 0.005;
+                previousMousePosition = { x: clientX, y: clientY };
+            }
+        };
+
+        const onEnd = () => { isDragging = false; };
+
+        // Mouse Listeners
+        canvasEl.addEventListener('mousedown', e => onStart(e.clientX, e.clientY));
+        window.addEventListener('mouseup', onEnd);
+        window.addEventListener('mousemove', e => onMove(e.clientX, e.clientY));
+
+        // Touch Listeners
+        canvasEl.addEventListener('touchstart', e => {
+            onStart(e.touches[0].clientX, e.touches[0].clientY);
+            e.preventDefault();
+        }, { passive: false });
+        
+        window.addEventListener('touchend', onEnd);
+        window.addEventListener('touchmove', e => {
+            if(isDragging) e.preventDefault();
+            onMove(e.touches[0].clientX, e.touches[0].clientY);
+        }, { passive: false });
+
+        // Handle Resize
+        window.addEventListener('resize', () => {
+            if(wrapper && camera && renderer) {
+                const width = wrapper.clientWidth;
+                const height = wrapper.clientHeight;
+                camera.aspect = width / height;
+                camera.updateProjectionMatrix();
+                renderer.setSize(width, height);
+            }
+        });
+
+        // Trigger initial resize
+        window.dispatchEvent(new Event('resize'));
+
+    </script>
+</body>
+</html>
