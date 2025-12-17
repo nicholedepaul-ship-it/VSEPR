@@ -46,6 +46,7 @@
         <div class="flex-1">
             <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Parts Tray</h3>
             
+            <!-- Main Action Buttons -->
             <div class="grid grid-cols-2 gap-3 mb-4">
                 <button onclick="addPart('bond')" class="group relative flex flex-col items-center justify-center p-4 bg-slate-50 border-2 border-slate-200 rounded-xl hover:border-green-500 hover:bg-white hover:shadow-md transition-all active:scale-95">
                     <div class="w-10 h-10 mb-2 relative flex items-center justify-center">
@@ -58,7 +59,7 @@
 
                 <button onclick="addPart('lone')" class="group relative flex flex-col items-center justify-center p-4 bg-slate-50 border-2 border-slate-200 rounded-xl hover:border-amber-400 hover:bg-white hover:shadow-md transition-all active:scale-95">
                     <div class="w-10 h-10 mb-2 flex items-center justify-center">
-                       <div class="w-8 h-6 rounded-full bg-amber-200 border-2 border-amber-400 opacity-80 group-hover:scale-110 transition-transform"></div>
+                       <div class="w-8 h-5 rounded-full bg-amber-200 border-2 border-amber-400 opacity-80 group-hover:scale-110 transition-transform"></div>
                     </div>
                     <span class="text-xs font-bold text-slate-600 group-hover:text-amber-600">Add Lone Pair</span>
                 </button>
@@ -164,7 +165,7 @@
 
         // Challenge Data
         const challenges = [
-            { formula: "CO₂", name: "Carbon Dioxide", bonds: 2, lone: 0, hint: "Double bonds act as 1 domain" },
+            { formula: "HCN", name: "Hydrogen Cyanide", bonds: 2, lone: 0, hint: "2 Bonding Domains (Linear)" },
             { formula: "H₂O", name: "Water", bonds: 2, lone: 2, hint: "Oxygen has 2 lone pairs" },
             { formula: "BF₃", name: "Boron Trifluoride", bonds: 3, lone: 0, hint: "Incomplete octet (6e-)" },
             { formula: "NH₃", name: "Ammonia", bonds: 3, lone: 1, hint: "1 Lone Pair on Nitrogen" },
@@ -313,24 +314,26 @@
 
             // 2. Assign Types (Lone Pairs first)
             let types = [];
-            for(let i=0; i<lonePairs; i++) types.push('lone');
-            for(let i=0; i<bonds; i++) types.push('bond');
+            for(let i=0; i<lonePairs; i++) types.push({ type: 'lone' });
+            for(let i=0; i<bonds; i++) types.push({ type: 'bond' });
 
             // 3. Create Meshes
-            types.forEach((type, idx) => {
+            types.forEach((item, idx) => {
                 if(idx >= positions.length) return;
                 const pos = positions[idx];
 
-                // Stick (Bond)
-                const stickGeo = new THREE.CylinderGeometry(0.12, 0.12, r * 0.9, 12);
-                stickGeo.rotateX(Math.PI/2);
-                const stickMat = new THREE.MeshStandardMaterial({ color: '#cbd5e1', roughness: 0.3 });
-                const stick = new THREE.Mesh(stickGeo, stickMat);
-                stick.lookAt(pos);
-                stick.position.set(pos.x/2, pos.y/2, pos.z/2);
-                stick.castShadow = true;
-                
-                if (type === 'bond') {
+                if (item.type === 'bond') {
+                    // Stick (Bond)
+                    const stickGeo = new THREE.CylinderGeometry(0.12, 0.12, r * 0.9, 12);
+                    stickGeo.rotateX(Math.PI/2);
+                    const stickMat = new THREE.MeshStandardMaterial({ color: '#cbd5e1', roughness: 0.3 });
+                    const stick = new THREE.Mesh(stickGeo, stickMat);
+                    
+                    const stickPos = pos.clone().multiplyScalar(0.5); // Midpoint
+                    stick.position.copy(stickPos);
+                    stick.lookAt(pos);
+                    stick.castShadow = true;
+                    
                     // Atom (Green Ball)
                     const atomGeo = new THREE.SphereGeometry(0.65, 32, 32);
                     const atomMat = new THREE.MeshPhysicalMaterial({ 
@@ -343,8 +346,9 @@
                     atom.castShadow = true;
                     atom.receiveShadow = true;
                     
-                    moleculeGroup.add(atom);
                     moleculeGroup.add(stick);
+                    moleculeGroup.add(atom);
+
                 } else {
                     // Lone Pair (Transparent Balloon)
                     const lpGeo = new THREE.SphereGeometry(0.7, 24, 24);
@@ -358,7 +362,6 @@
                     });
                     const lp = new THREE.Mesh(lpGeo, lpMat);
                     
-                    // Position closer to center
                     const lpPos = pos.clone().normalize().multiplyScalar(1.2);
                     lp.position.copy(lpPos);
                     lp.lookAt(pos);
@@ -372,16 +375,26 @@
 
         // --- INTERACTION ---
         window.addPart = (type) => {
-            if (bonds + lonePairs >= 6) return;
-            if (type === 'bond') bonds++;
-            if (type === 'lone') lonePairs++;
+            const total = bonds + lonePairs;
+            if (total >= 6) return;
+            
+            if (type === 'bond') {
+                bonds++;
+            }
+            if (type === 'lone') {
+                lonePairs++;
+            }
             rebuildMolecule();
         };
 
-        // NEW: Function to remove parts
+        // Remove parts
         window.removePart = (type) => {
-            if (type === 'bond' && bonds > 0) bonds--;
-            if (type === 'lone' && lonePairs > 0) lonePairs--;
+            if (type === 'bond' && bonds > 0) {
+                bonds--;
+            }
+            if (type === 'lone' && lonePairs > 0) {
+                lonePairs--;
+            }
             rebuildMolecule();
         };
 
@@ -416,7 +429,6 @@
                 feedback.innerHTML = "Correct! <br><span class='font-normal text-xs'>Great job building " + target.formula + "</span>";
                 feedback.className = "mb-3 text-sm font-bold bg-emerald-500 text-white p-2 rounded text-center shadow-inner animate-pulse";
                 
-                // Stop pulse after 500ms
                 setTimeout(() => feedback.classList.remove('animate-pulse'), 500);
 
                 document.getElementById('check-btn').classList.add('hidden');
