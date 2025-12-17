@@ -38,8 +38,8 @@
         <!-- Current Geometry Display -->
         <div class="bg-indigo-50 p-4 rounded-xl border border-indigo-100 text-center mb-6">
             <div class="text-[10px] uppercase font-bold text-indigo-400 tracking-wider mb-1">Current Shape</div>
-            <div id="geo-name" class="text-xl font-bold text-indigo-900">Linear</div>
-            <div id="angle-display" class="text-sm text-indigo-600 font-mono mt-1 font-semibold">180°</div>
+            <div id="geo-name" class="text-xl font-bold text-indigo-900">Single Atom</div>
+            <div id="angle-display" class="text-sm text-indigo-600 font-mono mt-1 font-semibold">—</div>
         </div>
 
         <!-- Interactive Parts Tray -->
@@ -80,7 +80,7 @@
                         <button onclick="removePart('bond')" class="w-6 h-6 flex items-center justify-center rounded bg-slate-100 text-slate-500 hover:bg-red-50 hover:text-red-500 transition-colors" title="Remove Atom">
                             <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"></path></svg>
                         </button>
-                        <span id="bond-count" class="font-mono font-bold w-4 text-center">2</span>
+                        <span id="bond-count" class="font-mono font-bold w-4 text-center">0</span>
                     </div>
                 </div>
 
@@ -159,7 +159,7 @@
         import * as THREE from 'three';
 
         // --- STATE ---
-        let bonds = 2;
+        let bonds = 0;
         let lonePairs = 0;
 
         // Challenge Data
@@ -233,10 +233,11 @@
             
             // Determine Geometry Name
             const total = bonds + lonePairs;
-            let name = "Unknown";
-            let angle = "";
+            let name = "Single Atom";
+            let angle = "—";
 
-            if (total === 2) { name = "Linear"; angle = "180°"; }
+            if (total === 1) { name = "Linear"; angle = "—"; }
+            else if (total === 2) { name = "Linear"; angle = "180°"; }
             else if (total === 3) {
                 if (lonePairs === 0) { name = "Trigonal Planar"; angle = "120°"; }
                 else { name = "Bent"; angle = "<120°"; }
@@ -276,7 +277,9 @@
             let positions = [];
 
             // 1. Calculate Positions (VSEPR Math)
-            if (total === 2) {
+            if (total === 1) {
+                positions = [new THREE.Vector3(r, 0, 0)];
+            } else if (total === 2) {
                 positions = [new THREE.Vector3(r,0,0), new THREE.Vector3(-r,0,0)];
             } else if (total === 3) {
                 for(let i=0; i<3; i++) {
